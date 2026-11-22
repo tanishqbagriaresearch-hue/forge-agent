@@ -34,11 +34,11 @@ Bring-your-own, configured only in TrueForge: any OpenAI-compatible endpoint is 
 | Criterion | Video | One-line claim |
 |---|---|---|
 | A1 Inline edit | 00:15–01:05 | Selection + instruction → scoped per-hunk diff; `FLASK_DEBUG=off` prints `False`. |
-| A2 Agent mode | 01:15–02:50 | Unnamed task reaches `cli.py`, `tests/test_cli.py`, `docs/cli.rst` via retrieval; pytest passes; `flask config` works. |
-| A3 Streaming & cancel | 02:50–03:15 | Tokens stream; Esc cancels in ~15 ms, `git status` clean, no half-applied edits. |
+| A2 Agent mode | 01:15–01:40 | Unnamed task reaches `cli.py`, `tests/test_cli.py`, `docs/cli.rst` via retrieval; pytest passes; `flask config` works. |
+| A3 Streaming & cancel | 01:40–02:05 | Tokens stream; Esc cancels in ~15 ms, `git status` clean, no half-applied edits. |
 | B1 Context | 01:25–01:41 | BM25 symbol chunks under a token budget, each with a stated reason; `@file`/`@sym` supported. |
 | B2 Diff safety | 00:35–00:45, 01:55–02:15 | No silent writes: approval-gated, per-hunk accept/reject, exact undo. |
-| B3 Resilience | 03:15–03:55 | Unreachable or 401 primary → clear notice → fallback model finishes; only-bad → one error, UI responsive. |
+| B3 Resilience | 02:05–02:45 | Unreachable or 401 primary → clear notice → fallback model finishes; only-bad → one error, UI responsive. |
 | B4 TrueForge depth | 01:41–01:55 | Sessions, streaming, approvals, MCP tools, deferred loading, compaction and cancel all on TrueForge; TrueForge session shown. |
 | C1 Video | — | ≤4 min, A→B→C with on-screen verification. |
 | C2 Write-up | — | This document. |
