@@ -4,3 +4,4 @@ dist/
 *.vsix
 .env
 .forge-e2e/
+forge-agent.config.json

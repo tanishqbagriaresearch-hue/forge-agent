@@ -1,0 +1,18 @@
+{
+  "baseUrl": "http://localhost:8790",
+  "providers": [
+    {
+      "provider": "primary",
+      "modelId": "gpt-4.1",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKeyEnv": "PRIMARY_API_KEY"
+    },
+    {
+      "provider": "backup",
+      "modelId": "llama-3.3-70b-versatile",
+      "baseUrl": "https://api.groq.com/openai/v1",
+      "apiKeyEnv": "BACKUP_API_KEY"
+    }
+  ],
+  "models": ["primary/gpt-4.1", "backup/llama-3.3-70b-versatile"]
+}
