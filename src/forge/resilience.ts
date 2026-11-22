@@ -16,7 +16,12 @@ export function isRetryable(e: unknown): boolean {
   if (isAuthError(e)) return false;
   const s = statusOf(e);
   if (s !== undefined && (s >= 500 || s === 429 || s === 408)) return true;
-  return /ECONN|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|fetch failed|connection|timed?[\s-]?out|timeout|network|socket|\b5\d\d\b|\b429\b|rate.?limit|overloaded|unavailable|unreachable/i.test(msgOf(e));
+  return /cannot connect|ECONN|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|fetch failed|connection|timed?[\s-]?out|timeout|network|socket|\b5\d\d\b|\b429\b|rate.?limit|overloaded|unavailable|unreachable/i.test(msgOf(e));
+}
+
+/** TrueForge prefixes failures that came from the model call itself with "[Model Error]". */
+export function isModelError(e: unknown): boolean {
+  return /\[Model Error\]/.test(msgOf(e));
 }
 
 export async function withFallback<T>(
@@ -33,7 +38,7 @@ export async function withFallback<T>(
         return await attempt(model);
       } catch (e) {
         last = e;
-        if (!isAuthError(e) && !isRetryable(e)) throw e;
+        if (!isAuthError(e) && !isRetryable(e) && !isModelError(e)) throw e;
         if (!isAuthError(e) && n < o.retries) {
           o.onEvent({ kind: "retry", model, message: msgOf(e) });
           await sleep(o.baseMs * 2 ** n);

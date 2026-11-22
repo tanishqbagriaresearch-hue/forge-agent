@@ -15,6 +15,10 @@ describe("classification", () => {
     for (const m of ["connect ECONNREFUSED 127.0.0.1:1", "fetch failed", "Connection error.", "503 Service Unavailable", "429 rate limit", "request timed out"])
       expect(isRetryable(new Error(m)), m).toBe(true);
   });
+  it("treats TrueForge's connection wording as retryable", () => {
+    for (const m of ["[Model Error] Cannot connect to API: bad port", "[Model Error] Cannot connect to API: other side closed"])
+      expect(isRetryable(new Error(m)), m).toBe(true);
+  });
   it("treats 401/403/invalid key as auth errors and not retryable", () => {
     for (const m of ["401 Unauthorized", "Incorrect API key provided", "403 Forbidden", "invalid api key"]) {
       expect(isAuthError(new Error(m)), m).toBe(true);
@@ -66,5 +70,18 @@ describe("withFallback", () => {
     const tried: string[] = [];
     await expect(withFallback(["a", "b"], async (m) => { tried.push(m); throw new Error("schema exploded"); }, o)).rejects.toThrow("schema exploded");
     expect(tried).toEqual(["a"]);
+  });
+
+  it("falls back without retrying on other [Model Error] failures", async () => {
+    const { o, sleeps } = mkOpts();
+    const tried: string[] = [];
+    const r = await withFallback(["a", "b"], async (m) => {
+      tried.push(m);
+      if (m === "a") throw new Error("[Model Error] Request failed (404): Not Found");
+      return m;
+    }, o);
+    expect(r).toBe("b");
+    expect(tried).toEqual(["a", "b"]);
+    expect(sleeps).toEqual([]);
   });
 });

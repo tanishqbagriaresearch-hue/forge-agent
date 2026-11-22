@@ -24,6 +24,7 @@ const sh = (cmd: string, args: string[], cwd = FLASK, env: NodeJS.ProcessEnv = {
   execFileSync(cmd, args, { cwd, encoding: "utf8", env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"] });
 const git = (...a: string[]) => sh("git", a);
 const reset = () => { git("checkout", "-q", "--", "."); git("clean", "-fdq"); };
+const doReset = () => { if (!process.env.E2E_KEEP) reset(); };
 const dirty = () => git("status", "--porcelain").trim();
 
 // ---------- the fixed task wording (exact, from the brief) ----------
@@ -114,7 +115,7 @@ const bSteps = (): MockReply[] => [
   call("propose_edit", { path: "tests/test_cli.py", old_text: "def test_run_cert_path():", new_text: B_TEST }),
   call("propose_edit", { path: "docs/cli.rst", old_text: "Use :meth:`~Flask.shell_context_processor` to add other automatic imports.\n", new_text: B_DOC }),
   call("apply_changes", { summary: "Add flask config command, test and docs" }),
-  call("run_command", { command: "pytest tests/test_cli.py -q" }),
+  call("call_tool", { mcp_server: "forge-editor", tool_name: "run_command", input: { command: "pytest tests/test_cli.py -q" } }),
   { text: "Added the config command in cli.py, a test in tests/test_cli.py and docs in docs/cli.rst." },
 ];
 const goodScript = (messages: ChatMessage[], tools: string[]): MockReply => {
@@ -187,7 +188,7 @@ async function main() {
   if (!fs.existsSync(FLASK)) {
     sh("git", ["clone", "-q", "--depth", "1", "--branch", "3.1.3", "https://github.com/pallets/flask.git", FLASK], WORK);
     sh("python3", ["-m", "venv", path.join(WORK, "venv")], WORK);
-    sh(path.join(VENV, "pip"), ["install", "-q", "-e", ".", "pytest"], FLASK);
+    sh(path.join(VENV, "pip"), ["install", "-q", "-e", ".", "pytest==9.0.2"], FLASK); // version from Flask 3.1.3 uv.lock; newer pytest breaks its tests
   }
   reset();
   const head = git("rev-parse", "--short=8", "HEAD").trim();
@@ -200,7 +201,7 @@ async function main() {
   try {
     await upsertModelProvider(TF, { provider: "mockgood", name: "mockgood", modelId: "mock-1", baseUrl: good.url, apiKey: "k" });
     await upsertModelProvider(TF, { provider: "mockauth", name: "mockauth", modelId: "mock-1", baseUrl: auth.url, apiKey: "bad-key" });
-    await upsertModelProvider(TF, { provider: "mockbad", name: "mockbad", modelId: "mock-1", baseUrl: "http://127.0.0.1:1/v1", apiKey: "k" });
+    await upsertModelProvider(TF, { provider: "mockbad", name: "mockbad", modelId: "mock-1", baseUrl: "http://127.0.0.1:59999/v1", apiKey: "k" });
     const GOOD = "mockgood/mockgood", AUTH = "mockauth/mockauth", BAD = "mockbad/mockbad";
 
     // ===== Task A: inline edit =====
@@ -222,7 +223,7 @@ async function main() {
       // undo
       const u = await w.core.undoLast();
       check("A", "undo restores the file exactly", u.ok && dirty() === "", u.message);
-      await w.core.close(); reset();
+      await w.core.close(); doReset();
     }
 
     // ===== Task B: agent mode, 3+ files, none named =====
@@ -249,7 +250,7 @@ async function main() {
       check("B", "docs mention the new command", fs.readFileSync(path.join(FLASK, "docs/cli.rst"), "utf8").includes("Show the Config"));
       const ranCmd = w.host.commands.length;
       check("B", "run_command executed under auto-approve policy (no prompt)", ranCmd === 0 && w.log.toolCalls.some((t) => t.endsWith("run_command")));
-      await w.core.close(); reset();
+      await w.core.close(); doReset();
     }
 
     // ===== Task C: resilience =====
@@ -262,14 +263,14 @@ async function main() {
       check("C", "unreachable primary -> automatic fallback to second model completes Task A", r.status === "done" && r.model === GOOD, `${r.status}/${r.model} in ${ms}ms`);
       check("C", "user sees a clear fallback notice", w.log.notices.some((n) => /falling back/i.test(n)), w.log.notices.join(" | "));
       check("C", "Task A result is correct after fallback", sh(path.join(VENV, "python"), ["-c", "from flask.helpers import get_debug_flag; print(get_debug_flag())"], FLASK, { FLASK_DEBUG: "off" }).trim() === "False");
-      await w.core.close(); reset();
+      await w.core.close(); doReset();
     }
     {
       mode = "A"; toolNames = [];
       const w = await world([AUTH, GOOD]);
       const r = await w.core.runner.run(`File: src/flask/helpers.py\nLines 28-33.\nInstruction: ${TASK_A}`);
       check("C", "invalid API key (401) on primary -> fallback completes", r.status === "done" && r.model === GOOD, `${r.status}/${r.model}; ${w.log.notices.join(" | ").slice(0, 200)}`);
-      await w.core.close(); reset();
+      await w.core.close(); doReset();
     }
     {
       const w = await world([BAD]);
@@ -277,7 +278,7 @@ async function main() {
       const r = await w.core.runner.run(`File: src/flask/helpers.py\nLines 28-33.\nInstruction: ${TASK_A}`);
       check("C", "only an unreachable model -> clear error, no hang", r.status === "error" && Date.now() - t0 < 60000, `${r.status} in ${Date.now() - t0}ms; ${w.log.notices.at(-1)?.slice(0, 160)}`);
       check("C", "git status shows no files changed", dirty() === "", dirty());
-      await w.core.close(); reset();
+      await w.core.close(); doReset();
     }
 
     // ===== Cancellation =====
@@ -293,7 +294,7 @@ async function main() {
       check("cancel", "tokens streamed before cancel", got, w.log.delta.slice(0, 40));
       check("cancel", "cancel is immediate and run ends cancelled", r.status === "cancelled" && ms < 3000, `${r.status} in ${ms}ms`);
       check("cancel", "workspace untouched", dirty() === "");
-      await w.core.close(); reset();
+      await w.core.close(); doReset();
     }
     {
       mode = "A"; toolNames = [];
@@ -305,7 +306,7 @@ async function main() {
       const r = await p;
       check("cancel", "run reached the pending diff review", inReview);
       check("cancel", "cancel during review ends cancelled quickly with nothing written", r.status === "cancelled" && Date.now() - c0 < 3000 && dirty() === "", `${r.status} in ${Date.now() - c0}ms`);
-      await w.core.close(); reset();
+      await w.core.close(); doReset();
     }
 
     // ===== Per-hunk rejection end-to-end =====
@@ -314,7 +315,7 @@ async function main() {
       const w = await world([GOOD], { decide: async (items) => new Map(items.map((i) => [i.abs, new Set<number>()])) });
       const r = await w.core.runner.run(`File: src/flask/helpers.py\nLines 28-33.\nInstruction: ${TASK_A}`);
       check("review", "rejecting every hunk writes nothing and the run still ends cleanly", dirty() === "" && (r.status === "done" || r.status === "error"), `${r.status}; ${dirty()}`);
-      await w.core.close(); reset();
+      await w.core.close(); doReset();
     }
   } finally {
     if (process.env.E2E_DEBUG) for (const t of (good.requests[0]?.tools ?? []).filter((x: any) => ["call_tool","list_tools","get_tool_info"].includes(x.function?.name))) console.log("TOOLDEF", JSON.stringify(t).slice(0, 900));
