@@ -101,6 +101,41 @@ describe("AgentRunner", () => {
     expect(t.log.toolResults[0]).toContain("apply_changes:APPLIED");
   });
 
+  it("reads tool calls streamed as deltas (real TrueForge shape) and drives review", async () => {
+    const delta = (id: string, extra: object): ForgeEvent => ({ type: "model.message.delta", id, threadId: "main", ...extra });
+    const t = setup(["good"], {
+      good: [
+        [created(), { type: "model.message", id: "m1", threadId: "main" }, stageXY,
+          delta("m1", { toolCalls: [{ index: 0, id: "tc1", type: "function", function: { name: "apply_changes", arguments: "" } }] }),
+          delta("m1", { toolCalls: [{ index: 0, function: { arguments: '{"summary":' } }] }),
+          delta("m1", { toolCalls: [{ index: 0, function: { arguments: '"edit x"}' } }] }),
+          delta("m1", { finishReason: "tool_calls" }),
+          { type: "tool.approval_required", id: "e5", threadId: "main", toolCalls: [{ id: "tc1", sourceEventId: "m1" }] },
+          { type: "turn.update", id: "e6", state: { status: "paused" }, threadId: null }],
+        [done("e8")],
+      ],
+    });
+    await t.runner.run("go");
+    expect(t.log.toolCalls).toEqual(["apply_changes"]);
+    expect(t.host.reviews).toHaveLength(1);
+    expect(t.calls.sent).toEqual([{ type: "user.tool_approval", threadId: "main", toolCallId: "tc1", approval: { status: "allow" } }]);
+  });
+
+  it("unwraps deferred tools called through call_tool and gates run_command on the inner command", async () => {
+    const t = setup(["good"], {
+      good: [
+        [created(), msg("e2", "call_tool", { mcp_server: "forge-editor", tool_name: "run_command", input: { command: "rm -rf /" } }),
+          { type: "tool.approval_required", id: "e3", threadId: "main", toolCalls: [{ id: "tc-e2", sourceEventId: "e2" }] }],
+        [done("e4")],
+      ],
+    });
+    (t.host as any).confirmCommand = async (c: string) => { t.host.commands.push(c); return false; };
+    await t.runner.run("x");
+    expect(t.log.toolCalls).toEqual(["run_command"]);
+    expect(t.host.commands).toEqual(["rm -rf /"]);
+    expect(t.calls.sent[0].approval.status).toBe("deny");
+  });
+
   it("denies the tool call when the user accepts no hunks", async () => {
     const t = setup(["good"], {
       good: [

@@ -88,6 +88,17 @@ export class AgentRunner {
     const { id } = await client.createSession(buildAgentSpec(model, this.o.mcpName));
     this.sessionId = id;
     const calls = new Map<string, { name: string; args: any }>();
+    const partials = new Map<string, { id: string; name: string; args: string }>();
+    // Tool calls arrive as streamed deltas; deferred tools arrive wrapped in call_tool({mcp_server, tool_name, input}).
+    const finalize = (id: string, rawName: string, rawArgs: string) => {
+      if (!id || calls.has(id)) return;
+      let args: any = {};
+      try { args = JSON.parse(rawArgs || "{}"); } catch { /* keep {} */ }
+      let name = rawName;
+      if (rawName === "call_tool" && typeof args?.tool_name === "string") { name = args.tool_name; args = args.input ?? {}; }
+      calls.set(id, { name, args });
+      this.o.events.toolCall(name, args);
+    };
     let turnId = "";
     let lastId: string | undefined;
     let stream = await client.startTurn(id, prompt);
@@ -105,14 +116,23 @@ export class AgentRunner {
         lastId = ev.id ?? lastId;
         switch (ev.type) {
           case "turn.created": turnId = ev.turnId; break;
-          case "model.message.delta": if (ev.content) this.o.events.delta(ev.content); break;
-          case "model.message":
-            for (const tc of ev.toolCalls ?? []) {
-              let args: any = {};
-              try { args = JSON.parse(tc.function?.arguments ?? "{}"); } catch { /* keep {} */ }
-              calls.set(tc.id, { name: tc.function?.name, args });
-              this.o.events.toolCall(tc.function?.name, args);
+          case "model.message.delta": {
+            if (ev.content) this.o.events.delta(ev.content);
+            for (const d of ev.toolCalls ?? []) {
+              const key = `${ev.id}:${d.index ?? 0}`;
+              const slot = partials.get(key) ?? { id: "", name: "", args: "" };
+              if (d.id) slot.id = d.id;
+              if (d.function?.name) slot.name = d.function.name;
+              if (d.function?.arguments) slot.args += d.function.arguments;
+              partials.set(key, slot);
             }
+            if (ev.finishReason) {
+              for (const [key, slot] of partials) if (key.startsWith(`${ev.id}:`)) { finalize(slot.id, slot.name, slot.args); partials.delete(key); }
+            }
+            break;
+          }
+          case "model.message":
+            for (const tc of ev.toolCalls ?? []) finalize(tc.id, tc.function?.name, tc.function?.arguments ?? "{}");
             break;
           case "tool.response": this.o.events.toolResult(calls.get(ev.toolCallId)?.name ?? "tool", String(ev.content ?? "")); break;
           case "tool.approval_required": pending = { threadId: ev.threadId, refs: ev.toolCalls ?? [] }; break;
