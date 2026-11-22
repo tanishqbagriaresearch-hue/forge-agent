@@ -3,6 +3,10 @@ import path from "node:path";
 
 const SKIP_DIRS = new Set([".git", "node_modules", "venv", ".venv", "__pycache__", "dist", ".tox", ".mypy_cache", ".pytest_cache", ".idea", ".vscode-test"]);
 
+export function isIgnoredPath(rel: string): boolean {
+  return rel.split(/[\\/]/).some((seg) => SKIP_DIRS.has(seg));
+}
+
 export async function listFiles(root: string, opts: { maxBytes?: number } = {}): Promise<string[]> {
   const maxBytes = opts.maxBytes ?? 400_000;
   const out: string[] = [];

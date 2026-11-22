@@ -1,0 +1,14 @@
+body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground); padding: 6px; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; gap: 6px; }
+#bar { display: flex; gap: 8px; align-items: center; }
+#bar select { flex: 1; background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border); padding: 2px; }
+#status { font-size: 0.85em; opacity: .8; }
+#status.running { color: var(--vscode-charts-blue); } #status.error { color: var(--vscode-errorForeground); } #status.paused { color: var(--vscode-charts-yellow); }
+#log { flex: 1; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
+.msg { margin: 4px 0; } .user { color: var(--vscode-textLink-foreground); }
+.tool { font-family: var(--vscode-editor-font-family); font-size: .85em; opacity: .85; border-left: 2px solid var(--vscode-charts-purple); padding-left: 6px; }
+.notice { font-size: .85em; color: var(--vscode-charts-yellow); }
+#ctxbox { font-size: .85em; max-height: 25%; overflow: auto; } #ctx { margin: 2px 0; padding-left: 16px; } #ctx .why { opacity: .65; }
+#input textarea { width: 100%; box-sizing: border-box; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); resize: vertical; }
+#buttons { display: flex; gap: 6px; margin-top: 4px; }
+button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 4px 10px; cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }

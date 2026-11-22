@@ -22,7 +22,140 @@
     "e2e": "tsx scripts/e2e-flask.mts",
     "package": "vsce package --no-dependencies"
   },
-  "contributes": {},
+  "contributes": {
+    "commands": [
+      {
+        "command": "forgeAgent.inlineEdit",
+        "title": "Forge: Edit Selection"
+      },
+      {
+        "command": "forgeAgent.openPanel",
+        "title": "Forge: Open Agent Panel"
+      },
+      {
+        "command": "forgeAgent.stop",
+        "title": "Forge: Stop"
+      },
+      {
+        "command": "forgeAgent.undo",
+        "title": "Forge: Undo Last Applied Change"
+      },
+      {
+        "command": "forgeAgent.switchModel",
+        "title": "Forge: Switch Model"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "forgeAgent.inlineEdit",
+        "key": "ctrl+alt+k",
+        "mac": "cmd+alt+k",
+        "when": "editorTextFocus && editorHasSelection"
+      },
+      {
+        "command": "forgeAgent.stop",
+        "key": "escape",
+        "when": "forgeAgent.running && !suggestWidgetVisible && !inSnippetMode && !editorHasSelection"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "forgeAgent.inlineEdit",
+          "when": "editorHasSelection",
+          "group": "navigation@100"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "forge-agent",
+          "title": "Forge Agent",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "forge-agent": [
+        {
+          "type": "webview",
+          "id": "forgeAgent.panel",
+          "name": "Agent"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Forge Agent",
+      "properties": {
+        "forgeAgent.baseUrl": {
+          "type": "string",
+          "default": "http://localhost:8790",
+          "description": "URL of the local TrueForge server (npx @truefoundry/trueforge@latest)."
+        },
+        "forgeAgent.models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Ordered TrueForge model references (provider/name). The first is primary; the rest are automatic fallbacks."
+        },
+        "forgeAgent.providers": {
+          "type": "array",
+          "default": [],
+          "description": "Optional OpenAI-compatible endpoints to register in TrueForge on first use. API keys are read from the named environment variable, never stored.",
+          "items": {
+            "type": "object",
+            "required": [
+              "provider",
+              "modelId",
+              "baseUrl"
+            ],
+            "properties": {
+              "provider": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "modelId": {
+                "type": "string"
+              },
+              "baseUrl": {
+                "type": "string"
+              },
+              "apiKeyEnv": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "forgeAgent.tokenBudget": {
+          "type": "number",
+          "default": 6000,
+          "description": "Token budget for automatic context retrieval per call."
+        },
+        "forgeAgent.mcpPort": {
+          "type": "number",
+          "default": 0,
+          "description": "Port for the extension's localhost MCP server (0 = random)."
+        },
+        "forgeAgent.autoApproveCommands": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "^pytest",
+            "^python -m pytest",
+            "^flask "
+          ],
+          "description": "Regexes of terminal commands the agent may run without asking."
+        }
+      }
+    }
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@truefoundry/trueforge-sdk": "^0.185.0",
@@ -32,7 +165,7 @@
   "devDependencies": {
     "@types/diff": "^7.0.2",
     "@types/node": "^26.6.6",
-    "@types/vscode": "^1.146.0",
+    "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^4.1.1",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
