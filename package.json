@@ -1,0 +1,42 @@
+{
+  "name": "forge-agent",
+  "displayName": "Forge Agent",
+  "description": "A VS Code coding agent whose agent loop runs on TrueForge.",
+  "version": "0.1.0",
+  "publisher": "forge-agent",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0",
+    "node": ">=22.14"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run test",
+    "provision": "tsx scripts/provision.ts",
+    "gen-agent": "tsx scripts/gen-agent.ts",
+    "e2e": "tsx scripts/e2e-flask.ts",
+    "package": "vsce package --no-dependencies"
+  },
+  "contributes": {},
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@truefoundry/trueforge-sdk": "^0.185.0",
+    "diff": "^9.0.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/diff": "^7.0.2",
+    "@types/node": "^26.6.6",
+    "@types/vscode": "^1.146.0",
+    "@vscode/vsce": "^4.1.1",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
+  }
+}
