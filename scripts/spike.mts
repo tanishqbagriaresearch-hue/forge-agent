@@ -1,0 +1,15 @@
+import { startMockOpenAI } from "./mock-openai";
+import { upsertModelProvider } from "../src/forge/provision";
+import { makeClient } from "../src/forge/client";
+const TF = process.env.TF ?? "http://localhost:8790";
+const mock = await startMockOpenAI(() => ({ text: "Hello from the mock model." }));
+await upsertModelProvider(TF, { provider: "mockgood", name: "mockgood", modelId: "mock-1", baseUrl: mock.url, apiKey: "k" });
+const models: any = await (await fetch(`${TF}/api/v1/models`)).json();
+console.log("MODELS", JSON.stringify(models).slice(0, 600));
+const name = "mockgood/mockgood";
+const c = makeClient(TF);
+const { id } = await c.createSession({ model: { name }, instructions: "be brief" });
+console.log("session", id, "model", name);
+for await (const ev of await c.startTurn(id, "hi")) console.log(ev.type, JSON.stringify(ev).slice(0, 220));
+console.log("MOCK PATHS", (mock.requests as any).paths);
+await mock.close();

@@ -23,7 +23,7 @@ export async function startMockOpenAI(script: MockScript, port = 0) {
     let raw = "";
     for await (const c of req) raw += c;
     const body = JSON.parse(raw || "{}");
-    requests.push(body);
+    requests.push(body); (requests as any).paths = ((requests as any).paths ?? []).concat(req.url);
     const tools: string[] = (body.tools ?? []).map((t: any) => t.function?.name ?? t.name);
     const reply = await script(body.messages ?? [], tools);
     if ("status" in reply) { res.statusCode = reply.status; res.end(JSON.stringify({ error: { message: "mock error", type: "mock" } })); return; }

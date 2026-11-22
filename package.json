@@ -17,9 +17,9 @@
     "build": "node esbuild.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run test",
-    "provision": "tsx scripts/provision.ts",
+    "provision": "tsx scripts/provision.mts",
     "gen-agent": "tsx scripts/gen-agent.ts",
-    "e2e": "tsx scripts/e2e-flask.ts",
+    "e2e": "tsx scripts/e2e-flask.mts",
     "package": "vsce package --no-dependencies"
   },
   "contributes": {},
