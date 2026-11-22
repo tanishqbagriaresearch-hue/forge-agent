@@ -14,5 +14,5 @@
       "apiKeyEnv": "BACKUP_API_KEY"
     }
   ],
-  "models": ["primary/gpt-4.1", "backup/llama-3.3-70b-versatile"]
+  "models": ["primary/gpt-4-1", "backup/llama-3-3-70b-versatile"]
 }

@@ -10,7 +10,18 @@ export function specFromProviderCfg(
   p: { provider: string; name?: string; modelId: string; baseUrl: string },
   apiKey?: string,
 ): ModelSpec {
-  return { provider: p.provider, name: p.name ?? p.modelId, modelId: p.modelId, baseUrl: p.baseUrl, apiKey };
+  return { provider: p.provider, name: p.name ?? slugifyModelName(p.modelId), modelId: p.modelId, baseUrl: p.baseUrl, apiKey };
+}
+
+/** TrueForge requires manifest.models[].name to be 2-64 lowercase chars, starting with a letter,
+ * ending alphanumeric, hyphens only in between. modelIds like "gemini-2.5-flash" contain dots and
+ * must be slugified before being used as the name (and therefore in the <provider>/<name> ref). */
+export function slugifyModelName(id: string): string {
+  let s = id.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (!/^[a-z]/.test(s)) s = `m-${s}`;
+  s = s.replace(/-+$/, "");
+  if (!/[a-z0-9]$/.test(s)) s += "0";
+  return s.slice(0, 64);
 }
 
 const LOCAL_HINT =

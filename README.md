@@ -53,7 +53,11 @@ export PRIMARY_API_KEY=...   BACKUP_API_KEY=...     # never committed; read from
 npm run provision            # registers each endpoint in TrueForge as a "custom" OpenAI-compatible provider
 ```
 
-Model references are `<provider>/<modelId>`. Any OpenAI-compatible endpoint (hosted or local, e.g. Ollama/vLLM) works.
+Model references are `<provider>/<name>`, where `name` defaults to a slugified form of `modelId` (TrueForge requires lowercase,
+letter-start, alphanumeric-end, hyphens only in between — so `gemini-2.5-flash` becomes `gemini-2-5-flash`). **Always copy the exact
+`configured <ref> -> ...` lines `npm run provision` prints** into `forgeAgent.models` / the config's `"models"` field, rather than typing
+the raw model id — the script also warns if your `"models"` list doesn't match what it actually registered. Any OpenAI-compatible
+endpoint (hosted or local, e.g. Ollama/vLLM) works.
 The **first** entry in `models` is primary; the rest are automatic fallbacks (see Resilience).
 
 ### 3. The agent definition

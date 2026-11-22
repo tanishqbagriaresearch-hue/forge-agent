@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { upsertModelProvider, upsertMcpServer, modelRef, specFromProviderCfg } from "../src/forge/provision";
+import { upsertModelProvider, upsertMcpServer, modelRef, specFromProviderCfg, slugifyModelName } from "../src/forge/provision";
 
 function fakeFetch(status = 200) {
   const calls: { url: string; init: RequestInit }[] = [];
@@ -55,13 +55,32 @@ describe("provision", () => {
 });
 
 describe("specFromProviderCfg", () => {
-  it("defaults the model name to modelId, so the ref printed matches <provider>/<modelId> from forgeAgent.models", () => {
-    const spec = specFromProviderCfg({ provider: "primary", modelId: "gemini-2.5-flash", baseUrl: "https://x/v1" }, "key123");
-    expect(modelRef(spec)).toBe("primary/gemini-2.5-flash");
+  it("defaults the model name to a slug of modelId (plain ids need no change), carrying the API key", () => {
+    const spec = specFromProviderCfg({ provider: "primary", modelId: "gpt4plain", baseUrl: "https://x/v1" }, "key123");
+    expect(modelRef(spec)).toBe("primary/gpt4plain");
     expect(spec.apiKey).toBe("key123");
   });
   it("still honours an explicit name override", () => {
     const spec = specFromProviderCfg({ provider: "primary", name: "custom", modelId: "gemini-2.5-flash", baseUrl: "https://x/v1" });
     expect(modelRef(spec)).toBe("primary/custom");
+  });
+});
+
+describe("slugifyModelName", () => {
+  it("replaces dots and other invalid characters with hyphens, lowercased", () => {
+    expect(slugifyModelName("gemini-2.5-flash")).toBe("gemini-2-5-flash");
+    expect(slugifyModelName("Llama_3.3:70B")).toBe("llama-3-3-70b");
+  });
+  it("ensures the result starts with a letter and ends alphanumeric", () => {
+    expect(slugifyModelName("3.5-turbo")).toMatch(/^[a-z]/);
+    expect(slugifyModelName("model.")).toMatch(/[a-z0-9]$/);
+  });
+});
+
+describe("specFromProviderCfg with a dotted modelId (TrueForge's real naming rule)", () => {
+  it("defaults name to a TrueForge-valid slug of modelId, so the ref is usable in forgeAgent.models", () => {
+    const spec = specFromProviderCfg({ provider: "primary", modelId: "gemini-2.5-flash", baseUrl: "https://x/v1" });
+    expect(modelRef(spec)).toBe("primary/gemini-2-5-flash");
+    expect(spec.name).toMatch(/^[a-z][a-z0-9-]*[a-z0-9]$/);
   });
 });
