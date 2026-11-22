@@ -1,3 +1,4 @@
+import { isSafeAutoApprove } from "./commands";
 import type { Host, ReviewItem } from "../host";
 import type { Overlay } from "../workspace/overlay";
 import type { ReviewState } from "../mcp/tools";
@@ -27,6 +28,7 @@ export class AgentRunner {
   private client: TrueForgeLike;
   private abort = new AbortController();
   private cancelled = false;
+  private running = false;
   private sessionId: string | undefined;
   private models: string[];
   constructor(private o: RunnerOptions) {
@@ -40,6 +42,8 @@ export class AgentRunner {
 
   async run(prompt: string): Promise<{ status: string; model: string }> {
     const { events } = this.o;
+    if (this.running) { events.notice("Forge is already working on a request; wait for it or stop it first."); return { status: "busy", model: "" }; }
+    this.running = true;
     this.cancelled = false;
     this.abort = new AbortController();
     this.o.review.signal = this.abort.signal;
@@ -51,7 +55,8 @@ export class AgentRunner {
         usedModel = model;
         return this.attempt(model, prompt);
       }, {
-        retries: this.o.retries ?? 2, baseMs: this.o.baseMs ?? 800, sleep: this.o.sleep,
+        retries: this.o.retries ?? 2, baseMs: this.o.baseMs ?? 800,
+        sleep: (ms) => { const s = this.o.sleep ?? ((n: number) => new Promise<void>((r) => setTimeout(r, n))); return Promise.race([s(ms), new Promise<void>((r) => { if (this.abort.signal.aborted) r(); else this.abort.signal.addEventListener("abort", () => r(), { once: true }); })]); },
         onEvent: (e) => events.notice(this.describe(e)),
       });
       events.status(status);
@@ -62,6 +67,7 @@ export class AgentRunner {
       events.status("error", message);
       return { status: "error", model: usedModel };
     } finally {
+      this.running = false;
       this.o.overlay.clear();
     }
   }
@@ -83,10 +89,12 @@ export class AgentRunner {
 
   private async attempt(model: string, prompt: string): Promise<"done" | "cancelled"> {
     const { client } = this;
+    if (this.cancelled) return "cancelled";
     this.o.overlay.clear();
     this.o.review.decisions = null;
     const { id } = await client.createSession(buildAgentSpec(model, this.o.mcpName));
     this.sessionId = id;
+    if (this.cancelled) { try { await client.cancel(id); } catch { /* nothing started */ } return "cancelled"; }
     const calls = new Map<string, { name: string; args: any }>();
     const partials = new Map<string, { id: string; name: string; args: string }>();
     // Tool calls arrive as streamed deltas; deferred tools arrive wrapped in call_tool({mcp_server, tool_name, input}).
@@ -101,8 +109,10 @@ export class AgentRunner {
     };
     let turnId = "";
     let lastId: string | undefined;
-    let stream = await client.startTurn(id, prompt);
-    const aborted = new Promise<"abort">((res) => this.abort.signal.addEventListener("abort", () => res("abort"), { once: true }));
+    const aborted = new Promise<"abort">((res) => { if (this.abort.signal.aborted) res("abort"); else this.abort.signal.addEventListener("abort", () => res("abort"), { once: true }); });
+    const started = await Promise.race([client.startTurn(id, prompt), aborted]);
+    if (started === "abort") { try { await client.cancel(id); } catch { /* best effort */ } return "cancelled"; }
+    let stream = started;
 
     for (;;) {
       let pending: Pending | null = null;
@@ -178,7 +188,7 @@ export class AgentRunner {
     }
     if (name === "run_command") {
       const cmd = String(args?.command ?? "");
-      if (this.o.autoApproveCommands?.some((re) => re.test(cmd))) return { status: "allow" };
+      if (this.o.autoApproveCommands && isSafeAutoApprove(cmd, this.o.autoApproveCommands)) return { status: "allow" };
       return (await host.confirmCommand(cmd, this.abort.signal)) ? { status: "allow" } : { status: "deny", reason: "the user declined to run this command" };
     }
     return { status: "deny", reason: `tool ${name ?? "unknown"} is not approved` };

@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import path from "node:path";
-import { createCore, type Core } from "./core";
+import { createCore, undoLastChange, type Core } from "./core";
+import { UndoStack } from "./workspace/snapshot";
 import { readConfig } from "./config";
 import { VscodeReview } from "./ui/review";
 import { VscodeHost } from "./ui/vscodeHost";
@@ -27,6 +28,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
   review.register(ctx);
   const host = new VscodeHost(root, review);
   const hub: Hub = {};
+  const undoStack = new UndoStack(); // survives core restarts (settings changes)
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 90);
   statusBar.text = "$(tools) Forge";
   statusBar.tooltip = "Forge Agent";
@@ -65,7 +67,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
         await upsertModelProvider(cfg.baseUrl, { provider: p.provider, name: p.name ?? p.provider, modelId: p.modelId, baseUrl: p.baseUrl, apiKey });
       }
       const core = await createCore({
-        host, baseUrl: cfg.baseUrl, models: orderedModels(), events, mcpPort: cfg.mcpPort, tokenBudget: cfg.tokenBudget,
+        host, undo: undoStack, baseUrl: cfg.baseUrl, models: orderedModels(), events, mcpPort: cfg.mcpPort, tokenBudget: cfg.tokenBudget,
         onActivity: (a) => panel.post({ type: "activity", ...a }),
         autoApproveCommands: cfg.autoApproveCommands.map((r) => new RegExp(r)),
       });
@@ -74,7 +76,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
       return core;
     })().catch((e) => { starting = undefined; throw e; }));
 
-  const afterRun = () => panel.post({ type: "undoState", size: activeCore?.undo.size() ?? 0 });
+  const afterRun = () => panel.post({ type: "undoState", size: undoStack.size() });
   const deps = { getCore, setRunning, hub, afterRun };
 
   panel = new AgentPanel(ctx.extensionUri, {
@@ -102,8 +104,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
   });
   reg("forgeAgent.stop", async () => { await activeCore?.runner.cancel(); });
   reg("forgeAgent.undo", async () => {
-    if (!activeCore) { void vscode.window.showInformationMessage("Nothing to undo."); return; }
-    const r = await activeCore.undoLast();
+    const r = await undoLastChange(undoStack, host);
     void (r.ok ? vscode.window.showInformationMessage(r.message) : vscode.window.showWarningMessage(r.message));
     afterRun();
   });
@@ -122,10 +123,11 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
     activeCore.index.update(rel, del ? null : await host.readFile(uri.fsPath));
   };
   ctx.subscriptions.push(watcher, watcher.onDidChange((u) => void upd(u)), watcher.onDidCreate((u) => void upd(u)), watcher.onDidDelete((u) => void upd(u, true)),
-    vscode.workspace.onDidChangeConfiguration((e) => {
+    vscode.workspace.onDidChangeConfiguration(async (e) => {
       if (!e.affectsConfiguration("forgeAgent")) return;
       const old = activeCore; activeCore = undefined; starting = undefined;
-      void old?.close();
+      await old?.runner.cancel(); // never strand a running turn when its MCP server goes away
+      await old?.close();
       void vscode.window.showInformationMessage("Forge Agent: configuration changed; it will reconnect on next use.");
     }));
 }

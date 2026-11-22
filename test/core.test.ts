@@ -20,7 +20,7 @@ async function mk() {
 describe("core", () => {
   it("starts an editor MCP server and builds the index", async () => {
     const { core } = await mk();
-    expect(core.mcpUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/mcp$/);
+    expect(core.mcpUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/mcp\/[0-9a-f]{48}$/);
     expect(core.index.findSymbol("f")).toHaveLength(1);
     await core.close();
   });
@@ -63,6 +63,20 @@ describe("core", () => {
   it("undoLast with nothing to undo says so", async () => {
     const { core } = await mk();
     expect(await core.undoLast()).toEqual({ ok: false, message: "Nothing to undo." });
+    await core.close();
+  });
+});
+
+describe("core undo ownership", () => {
+  it("uses an injected UndoStack so history survives a core restart", async () => {
+    const { UndoStack } = await import("../src/workspace/snapshot");
+    const shared = new UndoStack();
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "core-"));
+    const core = await createCore({
+      host: new HeadlessHost(root), baseUrl: "http://localhost:1", models: ["m/m"], undo: shared,
+      events: { delta() {}, toolCall() {}, toolResult() {}, status() {}, notice() {} }, provision: async () => {},
+    });
+    expect(core.undo).toBe(shared);
     await core.close();
   });
 });

@@ -218,3 +218,24 @@ describe("AgentRunner", () => {
     expect(t.overlay.staged().size).toBe(0);
   });
 });
+
+describe("run lifecycle safety", () => {
+  it("cancel during retry backoff stops the run: no further session is created", async () => {
+    const t = setup(["a"], { a: [[created(), done("e2", { status: "error", message: "Connection error: ECONNREFUSED" })]] });
+    (t.runner as any).o.retries = 1;
+    (t.runner as any).o.sleep = async () => { await t.runner.cancel(); };
+    const r = await t.runner.run("go");
+    expect(r.status).toBe("cancelled");
+    expect(t.calls.created).toEqual(["a"]);
+  });
+  it("a second run while one is active is refused and does not disturb the first", async () => {
+    const t = setup(["a"], { a: (cancelled: Promise<void>) => (async function* () { yield created(); await cancelled; })() });
+    const first = t.runner.run("one");
+    await new Promise((r) => setTimeout(r, 20));
+    const second = await t.runner.run("two");
+    expect(second.status).toBe("busy");
+    expect(t.calls.created).toEqual(["a"]);
+    await t.runner.cancel();
+    expect((await first).status).toBe("cancelled");
+  });
+});

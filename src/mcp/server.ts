@@ -1,4 +1,5 @@
 import http from "node:http";
+import crypto from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -20,8 +21,14 @@ function buildServer(t: EditorTools): McpServer {
 }
 
 export async function startEditorMcp(tools: EditorTools, port = 0): Promise<{ url: string; close(): Promise<void> }> {
+  // Only TrueForge (which is told the secret URL) may call the editor tools: random path token, loopback Host only, no browser Origin.
+  const token = crypto.randomBytes(24).toString("hex");
+  const base = `/mcp/${token}`;
+  let boundPort = 0;
   const server = http.createServer(async (req, res) => {
-    if (!req.url?.startsWith("/mcp")) { res.statusCode = 404; res.end(); return; }
+    const host = String(req.headers.host ?? "");
+    if (req.headers.origin !== undefined || ![`127.0.0.1:${boundPort}`, `localhost:${boundPort}`].includes(host)) { res.statusCode = 403; res.end(); return; }
+    if (req.url !== base && !req.url?.startsWith(base + "?")) { res.statusCode = 404; res.end(); return; }
     if (req.method !== "POST") { res.statusCode = 405; res.setHeader("allow", "POST"); res.end(); return; }
     let raw = "";
     for await (const c of req) raw += c;
@@ -37,5 +44,6 @@ export async function startEditorMcp(tools: EditorTools, port = 0): Promise<{ ur
   });
   await new Promise<void>((r) => server.listen(port, "127.0.0.1", r));
   const p = (server.address() as AddressInfo).port;
-  return { url: `http://127.0.0.1:${p}/mcp`, close: () => new Promise<void>((r) => { server.closeAllConnections?.(); server.close(() => r()); }) };
+  boundPort = p;
+  return { url: `http://127.0.0.1:${p}${base}`, close: () => new Promise<void>((r) => { server.closeAllConnections?.(); server.close(() => r()); }) };
 }

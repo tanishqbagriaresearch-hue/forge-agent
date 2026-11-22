@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { Core } from "../core";
 
+let active = false;
 export type Hub = { onToolCall?: (name: string) => void };
 
 /** Runs one agent request with a cancellable progress notification. Never throws. */
@@ -9,6 +10,9 @@ export async function runWithProgress(
   prompt: string,
   title: string,
 ): Promise<void> {
+  if (active) { void vscode.window.showInformationMessage("Forge is already working on a request; stop it first or wait for it to finish."); return; }
+  active = true;
+  try {
   let core: Core;
   try { core = await deps.getCore(); } catch (e) { void vscode.window.showErrorMessage(explainStartError(e)); return; }
   deps.setRunning(true);
@@ -25,6 +29,7 @@ export async function runWithProgress(
     deps.setRunning(false);
     deps.afterRun();
   }
+  } finally { active = false; }
 }
 
 export function explainStartError(e: unknown): string {

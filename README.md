@@ -23,7 +23,7 @@ Requirements: Node ≥ 22.14, VS Code ≥ 1.90, git.
 git clone <this repo> forge-agent && cd forge-agent
 npm ci
 npm run build            # bundles dist/extension.js
-npm test                 # 74 unit tests, no network needed
+npm test                 # 95 unit tests, no network needed
 ```
 
 ### 1. Start TrueForge locally
@@ -78,8 +78,8 @@ Or install a packaged build: `npm run package` → `code --install-extension for
 | **Inline edit** | Select code → `Ctrl+Alt+K` (`Cmd+Alt+K`) or right-click → *Forge: Edit Selection* → type the instruction. Review the diff, then apply. |
 | **Agent mode** | Activity-bar *Forge Agent* panel → describe the task. The agent finds the files itself (`retrieve_context`, `find_symbol`, `search_workspace`), edits several files, and verifies with tests. |
 | **Context assembly** | `@path/to/file` and `@sym:name` in the panel expand within a token budget; the agent also retrieves automatically. The panel lists which chunks were chosen and why. |
-| **Diff review** | Nothing is written until you accept. Each hunk has Accept/Reject CodeLenses in a diff editor; *Apply accepted* writes only accepted hunks in one batch. *Forge: Undo Last Applied Change* restores the exact previous contents. |
-| **Streaming & cancel** | Tokens stream into the panel. `Esc`, the notification's Cancel, the status bar, or *Forge: Stop* cancels the TrueForge turn, closes any pending review and discards staged edits — the workspace is never half-written. |
+| **Diff review** | Nothing is written until you accept. A diff editor opens per file and a checklist lists every hunk (check/uncheck per hunk; Enter applies the checked ones, Esc rejects). Only accepted hunks are written, in one batch. (CodeLens toggles also appear if you enable `diffEditor.codeLens`.) *Forge: Undo Last Applied Change* restores the exact previous contents. |
+| **Streaming & cancel** | Tokens stream into the panel. `Esc` (when no widget is open), the notification's Cancel, the status bar, or *Forge: Stop* cancels the TrueForge turn, closes any pending review and discards staged edits — the workspace is never half-written. |
 
 ### Resilience (Task C behaviour)
 
@@ -91,13 +91,19 @@ are in memory only, so `git status` stays clean.
 
 ## Verification evidence
 
-* `npm test` — 74 unit tests (hunk maths, overlay, undo, BM25 retrieval, MCP tools, runner, resilience, activation).
+* `npm test` — 95 unit tests (hunk maths, overlay, undo, BM25 retrieval, MCP tools, runner, resilience, activation).
 * `npm run e2e` — end-to-end against **real TrueForge** and **real Flask 3.1.3 @ 22d92470** (cloned to `/tmp/forge-e2e`,
   Python venv, pytest 9.0.2): Tasks A, B and C, cancel mid-stream, cancel during review, reject-all. 30/30 checks.
   The model in that harness is a *scripted mock* OpenAI-compatible server (so the run is deterministic and keyless);
   the agent loop, MCP tools, approvals, diff application, retrieval and fallbacks are real. For the real-model demo see the video.
 * The VS Code UI layer (CodeLens review, panel, inline edit) is covered by typecheck, bundling and a fake-`vscode` activation
   test; it must be smoke-tested by pressing F5 (see `docs/SMOKE_TEST.md`).
+
+## Security notes
+
+* The editor MCP server binds to 127.0.0.1 on a random port, serves only a secret random path (`/mcp/<48 hex>`, registered with TrueForge), and rejects non-loopback `Host` headers and any browser `Origin`.
+* `run_command` is approval-gated in TrueForge; only simple commands matching `forgeAgent.autoApproveCommands` (default `pytest`, `python -m pytest`, `flask …`) skip the prompt, and anything with `; & | $ \` < > ( )` or a newline always asks.
+* File tools resolve symlinks and refuse paths that leave the workspace.
 
 ## Layout
 

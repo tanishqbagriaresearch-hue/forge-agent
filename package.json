@@ -55,7 +55,7 @@
       {
         "command": "forgeAgent.stop",
         "key": "escape",
-        "when": "forgeAgent.running && !suggestWidgetVisible && !inSnippetMode && !editorHasSelection"
+        "when": "forgeAgent.running && !suggestWidgetVisible && !inSnippetMode && !editorHasSelection && !findWidgetVisible && !notificationToastsVisible && !inQuickOpen && !parameterHintsVisible && resourceScheme != forge-proposed && resourceScheme != forge-original"
       }
     ],
     "menus": {

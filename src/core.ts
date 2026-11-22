@@ -12,7 +12,7 @@ export type CoreOptions = {
   host: Host; baseUrl: string; models: string[]; events: RunEvents;
   mcpName?: string; mcpPort?: number; tokenBudget?: number;
   onActivity?: (a: Activity) => void; autoApproveCommands?: RegExp[];
-  retries?: number; baseMs?: number; client?: TrueForgeLike;
+  retries?: number; baseMs?: number; client?: TrueForgeLike; undo?: UndoStack;
   /** Registers the MCP server with TrueForge. Defaults to upsertMcpServer. */
   provision?: (mcpUrl: string) => Promise<void>;
 };
@@ -27,7 +27,7 @@ export async function createCore(o: CoreOptions): Promise<Core> {
   const { host } = o;
   const mcpName = o.mcpName ?? "forge-editor";
   const overlay = new Overlay((p) => host.readFile(p));
-  const undo = new UndoStack();
+  const undo = o.undo ?? new UndoStack();
   const index = await ContextIndex.build(host.root);
   const review: ReviewState = { decisions: null, signal: new AbortController().signal };
   const tools = new EditorTools({ host, overlay, undo, index, review, onActivity: o.onActivity ?? (() => {}), tokenBudget: o.tokenBudget ?? 6000 });
@@ -38,18 +38,21 @@ export async function createCore(o: CoreOptions): Promise<Core> {
     retries: o.retries, baseMs: o.baseMs, autoApproveCommands: o.autoApproveCommands,
   });
 
-  async function undoLast() {
-    const entry = undo.pop();
-    if (!entry) return { ok: false, message: "Nothing to undo." };
-    for (const f of entry.files) {
-      if ((await host.readFile(f.abs)) !== f.after) {
-        undo.push(entry);
-        return { ok: false, message: `Cannot undo "${entry.label}": ${f.abs} has changed since the agent edited it.` };
-      }
-    }
-    await host.applyFiles(entry.files.map((f) => ({ abs: f.abs, content: f.before })));
-    return { ok: true, message: `Undid: ${entry.label}` };
-  }
+  const undoLast = () => undoLastChange(undo, host);
 
   return { runner, undo, index, review, overlay, mcpUrl: mcp.url, close: () => mcp.close(), undoLast };
+}
+
+/** Reverts the newest applied change if the files are still exactly as the agent left them. */
+export async function undoLastChange(undo: UndoStack, host: Host): Promise<{ ok: boolean; message: string }> {
+  const entry = undo.pop();
+  if (!entry) return { ok: false, message: "Nothing to undo." };
+  for (const f of entry.files) {
+    if ((await host.readFile(f.abs)) !== f.after) {
+      undo.push(entry);
+      return { ok: false, message: `Cannot undo "${entry.label}": ${f.abs} has changed since the agent edited it.` };
+    }
+  }
+  await host.applyFiles(entry.files.map((f) => ({ abs: f.abs, content: f.before })));
+  return { ok: true, message: `Undid: ${entry.label}` };
 }

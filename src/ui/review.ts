@@ -1,12 +1,15 @@
 import * as vscode from "vscode";
 import path from "node:path";
 import type { ReviewItem } from "../host";
+import { hunkPickItems, decisionsFromPicks } from "./hunkPick";
 
 const ORIG = "forge-original";
 const PROP = "forge-proposed";
 
 /** Per-hunk review: native diff editor per file + CodeLens to accept/reject each hunk. */
 export class VscodeReview implements vscode.CodeLensProvider, vscode.TextDocumentContentProvider {
+  private seq = 0;
+  private picker: vscode.QuickPick<any> | null = null;
   private items = new Map<string, ReviewItem>();
   private accepted = new Map<string, Set<number>>();
   private finish: ((m: Map<string, Set<number>>) => void) | null = null;
@@ -25,13 +28,14 @@ export class VscodeReview implements vscode.CodeLensProvider, vscode.TextDocumen
       vscode.languages.registerCodeLensProvider({ scheme: PROP }, this),
       vscode.commands.registerCommand("forgeAgent.hunk.toggle", (abs: string, id: number) => this.toggle(abs, id)),
       vscode.commands.registerCommand("forgeAgent.review.apply", () => this.apply()),
+      vscode.commands.registerCommand("forgeAgent.review.pick", () => this.pick()),
       vscode.commands.registerCommand("forgeAgent.review.rejectAll", () => this.rejectAll()),
       this.status,
     );
   }
 
   private rel(abs: string) { return path.relative(this.root, abs).split(path.sep).join("/"); }
-  private uri(scheme: string, item: ReviewItem) { return vscode.Uri.from({ scheme, path: "/" + this.rel(item.abs), query: item.abs }); }
+  private uri(scheme: string, item: ReviewItem) { return vscode.Uri.from({ scheme, path: `/r${this.seq}/` + this.rel(item.abs), query: item.abs }); }
 
   provideTextDocumentContent(uri: vscode.Uri): string {
     const item = this.items.get(uri.query);
@@ -64,6 +68,7 @@ export class VscodeReview implements vscode.CodeLensProvider, vscode.TextDocumen
 
   review(items: ReviewItem[], signal: AbortSignal): Promise<Map<string, Set<number>>> {
     this.finish?.(new Map());
+    this.seq++;
     this.items = new Map(items.map((i) => [i.abs, i]));
     this.accepted = new Map(items.map((i) => [i.abs, new Set(i.hunks.map((h) => h.id))]));
     return new Promise((resolve) => {
@@ -77,11 +82,27 @@ export class VscodeReview implements vscode.CodeLensProvider, vscode.TextDocumen
           await vscode.commands.executeCommand("vscode.diff", this.uri(ORIG, item), this.uri(PROP, item), `Forge: ${this.rel(item.abs)} — review hunks`, { preview: false });
         }
         this.lenses.fire();
-        const choice = await vscode.window.showInformationMessage(
-          `Forge Agent proposed changes in ${items.length} file(s). Accept or reject each hunk with the CodeLens above it, then apply.`, "Apply accepted", "Reject all");
-        if (choice === "Apply accepted") this.apply(); else if (choice === "Reject all") this.rejectAll();
+        this.pick();
       })();
     });
+  }
+
+  /** Checkbox list of every hunk: Enter applies the checked ones, Esc rejects everything. Reopen from the status bar. */
+  private pick(): void {
+    if (!this.finish) return;
+    this.picker?.dispose();
+    const qp = vscode.window.createQuickPick<any>();
+    this.picker = qp;
+    qp.canSelectMany = true; qp.ignoreFocusOut = true; qp.matchOnDetail = true;
+    qp.title = "Forge: review proposed changes — check the hunks to apply";
+    qp.placeholder = "Enter = apply checked hunks · Esc = close this list (diffs stay open; use the status bar to re-open or reject all)";
+    const picks = hunkPickItems([...this.items.values()], this.root);
+    qp.items = picks;
+    qp.selectedItems = picks.filter((p) => this.accepted.get(p.abs)?.has(p.id));
+    qp.buttons = [];
+    qp.onDidAccept(() => { this.accepted = new Map([...this.items.keys()].map((k) => [k, new Set<number>()])); for (const [k, v] of decisionsFromPicks(qp.selectedItems)) this.accepted.set(k, v); qp.hide(); this.apply(); });
+    qp.onDidHide(() => { if (this.picker === qp) this.picker = null; qp.dispose(); this.updateStatus(); });
+    qp.show();
   }
 
   private toggle(abs: string, id: number): void {
@@ -98,12 +119,13 @@ export class VscodeReview implements vscode.CodeLensProvider, vscode.TextDocumen
   private updateStatus(): void {
     const total = [...this.items.values()].reduce((n, i) => n + i.hunks.length, 0);
     const ok = [...this.accepted.values()].reduce((n, s) => n + s.size, 0);
-    this.status.text = `$(git-pull-request) Forge review: ${ok}/${total} hunks accepted — click to apply`;
-    this.status.command = "forgeAgent.review.apply";
+    this.status.text = `$(git-pull-request) Forge review: ${ok}/${total} hunks accepted — click to choose hunks / apply`;
+    this.status.command = "forgeAgent.review.pick";
     this.status.show();
   }
 
   private async cleanup(): Promise<void> {
+    this.picker?.hide();
     this.status.hide();
     const tabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs).filter((t) => t.input instanceof vscode.TabInputTextDiff && (t.input as vscode.TabInputTextDiff).modified.scheme === PROP);
     try { await vscode.window.tabGroups.close(tabs); } catch { /* tabs already closed */ }
