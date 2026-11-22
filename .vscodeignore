@@ -4,4 +4,6 @@ scripts/**
 docs/**
 .superpowers/**
 node_modules/**
+.env
+forge-agent.config.json
 !dist/**

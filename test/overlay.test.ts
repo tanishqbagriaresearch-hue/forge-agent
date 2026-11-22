@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, it, expect } from "vitest";
 import { Overlay } from "../src/workspace/overlay";
 import { resolveInWorkspace } from "../src/workspace/paths";
@@ -51,13 +52,14 @@ describe("overlay", () => {
 });
 
 describe("resolveInWorkspace", () => {
+  const r = process.platform === "win32" ? "C:\\r" : "/r";
   it("accepts relative and inside-absolute paths", () => {
-    expect(resolveInWorkspace("/r", "src/a.py")).toBe("/r/src/a.py");
-    expect(resolveInWorkspace("/r", "/r/src/a.py")).toBe("/r/src/a.py");
+    expect(resolveInWorkspace(r, "src/a.py")).toBe(path.join(r, "src/a.py"));
+    expect(resolveInWorkspace(r, path.join(r, "src/a.py"))).toBe(path.join(r, "src/a.py"));
   });
   it("rejects escapes", () => {
-    expect(() => resolveInWorkspace("/r", "../x")).toThrow("outside workspace");
-    expect(() => resolveInWorkspace("/r", "/etc/passwd")).toThrow("outside workspace");
-    expect(() => resolveInWorkspace("/r", "a/../../x")).toThrow("outside workspace");
+    expect(() => resolveInWorkspace(r, "../x")).toThrow("outside workspace");
+    expect(() => resolveInWorkspace(r, process.platform === "win32" ? "C:\\etc\\passwd" : "/etc/passwd")).toThrow("outside workspace");
+    expect(() => resolveInWorkspace(r, "a/../../x")).toThrow("outside workspace");
   });
 });

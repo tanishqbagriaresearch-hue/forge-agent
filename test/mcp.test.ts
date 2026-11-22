@@ -127,17 +127,19 @@ describe("editor MCP", () => {
   });
 
   it("run_command runs in the workspace root, truncates long output", async () => {
-    const r1 = await call("run_command", { command: "echo hi && pwd" });
+    const cmd = process.platform === "win32" ? "echo hi && cd" : "echo hi && pwd";
+    const r1 = await call("run_command", { command: cmd });
     expect(text(r1)).toContain("exit code 0");
     expect(text(r1)).toContain("hi");
-    expect(text(r1)).toContain(fs.realpathSync(root));
+    expect(text(r1).toLowerCase()).toContain(fs.realpathSync(root).toLowerCase());
     const r2 = await call("run_command", { command: `node -e "console.log('x'.repeat(40000))"` });
     expect(text(r2).length).toBeLessThan(21000);
     expect(text(r2)).toContain("[truncated");
   });
 
   it("run_command stops when the run is aborted", async () => {
-    const p = call("run_command", { command: "sleep 30", timeout_seconds: 60 });
+    const cmd = process.platform === "win32" ? "ping -n 30 127.0.0.1 > nul" : "sleep 30";
+    const p = call("run_command", { command: cmd, timeout_seconds: 60 });
     setTimeout(() => abort.abort(), 200);
     const t0 = Date.now();
     const r = await p;
