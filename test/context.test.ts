@@ -123,4 +123,19 @@ describe("ContextIndex", () => {
     idx.update("src/flask/new.py", null);
     expect(idx.retrieve("zebra", 1000)).toEqual([]);
   });
+
+  it("ignores stop words in scoring and in the explanation", async () => {
+    const idx = await ContextIndex.build(root);
+    const r = idx.retrieve("the debug flag in the environment of it", 4000);
+    expect(r[0].why).toBe("matched: debug, flag, environment");
+  });
+
+  it("caps chunks per file so one file cannot crowd out others", async () => {
+    const idx = new (ContextIndex as any)() as ContextIndex;
+    idx.update("big.py", Array.from({ length: 10 }, (_, i) => `def parse_widget_${i}():\n    return "widget parse"\n`).join("\n"));
+    idx.update("other.py", "def widget_parser_entry():\n    return 'widget parse'\n");
+    const r = idx.retrieve("widget parse", 10_000);
+    expect(r.filter((c) => c.path === "big.py").length).toBeLessThanOrEqual(3);
+    expect(r.some((c) => c.path === "other.py")).toBe(true);
+  });
 });

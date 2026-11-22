@@ -5,7 +5,8 @@ import { chunkFile, type Chunk } from "./chunker";
 import { Bm25, tokenize } from "./bm25";
 
 export type RetrievedChunk = Chunk & { score: number; why: string };
-const STOP = new Set(["the", "and", "for", "with", "that", "this", "from", "into", "are", "all", "any", "its", "has", "have", "how", "what", "when", "where", "which", "should", "must", "will", "can", "not", "but", "add", "new"]);
+const STOP = new Set(("a an and are as at be but by can do does for from has have how if in into is it its of on or so that the their then there these this to was we what when where which will with without should must not all any add new also than via you your use used using").split(" "));
+const MAX_PER_FILE = 3;
 export const estimateTokens = (s: string) => Math.ceil(s.length / 4);
 const docText = (c: Chunk) => `${c.path} ${c.symbol ?? ""} ${c.symbol ?? ""} ${c.text}`;
 
@@ -51,6 +52,7 @@ export class ContextIndex {
       const cost = estimateTokens(c.text);
       if (used + cost > budgetTokens) continue;
       if (picked.some((p) => p.path === c.path && !(p.endLine < c.startLine || c.endLine < p.startLine))) continue;
+      if (picked.filter((p) => p.path === c.path).length >= MAX_PER_FILE) continue;
       const matched = qTerms.filter((t) => this.tokenSets[i].has(t));
       picked.push({ ...c, score: s, why: `matched: ${matched.join(", ")}` });
       used += cost;
