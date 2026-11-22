@@ -3,6 +3,16 @@ export type ModelSpec = { provider: string; name: string; modelId: string; baseU
 
 export const modelRef = (m: Pick<ModelSpec, "provider" | "name">) => `${m.provider}/${m.name}`;
 
+/** Builds a ModelSpec from a user-facing provider config. The ref (modelRef) is <provider>/<name>,
+ * and name defaults to modelId so it matches what "forgeAgent.models" / the config's "models" list say,
+ * instead of silently registering as <provider>/<provider>. */
+export function specFromProviderCfg(
+  p: { provider: string; name?: string; modelId: string; baseUrl: string },
+  apiKey?: string,
+): ModelSpec {
+  return { provider: p.provider, name: p.name ?? p.modelId, modelId: p.modelId, baseUrl: p.baseUrl, apiKey };
+}
+
 const LOCAL_HINT =
   " TrueForge blocks private/loopback URLs by default. Start it with OUTBOUND_URL_ALLOWED_HOSTS='[\"127.0.0.1\"]' (or NETWORK_POLICY_ENABLED=false) so it can reach your local model and the extension's MCP server.";
 

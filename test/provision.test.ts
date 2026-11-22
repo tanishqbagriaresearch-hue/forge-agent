@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { upsertModelProvider, upsertMcpServer, modelRef } from "../src/forge/provision";
+import { upsertModelProvider, upsertMcpServer, modelRef, specFromProviderCfg } from "../src/forge/provision";
 
 function fakeFetch(status = 200) {
   const calls: { url: string; init: RequestInit }[] = [];
@@ -51,5 +51,17 @@ describe("provision", () => {
   it("throws with the status code on non-2xx", async () => {
     const { f } = fakeFetch(500);
     await expect(upsertMcpServer("http://localhost:8790", "x-y", "http://a/mcp", f)).rejects.toThrow(/500/);
+  });
+});
+
+describe("specFromProviderCfg", () => {
+  it("defaults the model name to modelId, so the ref printed matches <provider>/<modelId> from forgeAgent.models", () => {
+    const spec = specFromProviderCfg({ provider: "primary", modelId: "gemini-2.5-flash", baseUrl: "https://x/v1" }, "key123");
+    expect(modelRef(spec)).toBe("primary/gemini-2.5-flash");
+    expect(spec.apiKey).toBe("key123");
+  });
+  it("still honours an explicit name override", () => {
+    const spec = specFromProviderCfg({ provider: "primary", name: "custom", modelId: "gemini-2.5-flash", baseUrl: "https://x/v1" });
+    expect(modelRef(spec)).toBe("primary/custom");
   });
 });

@@ -9,7 +9,7 @@ import { AgentPanel } from "./ui/panel";
 import { buildInlineEditPrompt } from "./ui/inlineEdit";
 import { runWithProgress, explainStartError, isRunActive, type Hub } from "./ui/run";
 import { parseMentions, expandMentions } from "./context/mentions";
-import { upsertModelProvider } from "./forge/provision";
+import { upsertModelProvider, specFromProviderCfg } from "./forge/provision";
 import { isIgnoredPath } from "./workspace/walk";
 import type { RunEvents } from "./agent/runner";
 
@@ -64,7 +64,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
       for (const p of cfg.providers) {
         const apiKey = p.apiKeyEnv ? process.env[p.apiKeyEnv] : undefined;
         if (p.apiKeyEnv && !apiKey) { events.notice(`Skipping provider ${p.provider}: environment variable ${p.apiKeyEnv} is not set.`); continue; }
-        await upsertModelProvider(cfg.baseUrl, { provider: p.provider, name: p.name ?? p.provider, modelId: p.modelId, baseUrl: p.baseUrl, apiKey });
+        await upsertModelProvider(cfg.baseUrl, specFromProviderCfg(p, apiKey));
       }
       const core = await createCore({
         host, undo: undoStack, baseUrl: cfg.baseUrl, models: orderedModels(), events, mcpPort: cfg.mcpPort, tokenBudget: cfg.tokenBudget,
