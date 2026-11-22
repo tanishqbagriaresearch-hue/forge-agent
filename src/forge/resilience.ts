@@ -39,7 +39,7 @@ export async function withFallback<T>(
       } catch (e) {
         last = e;
         if (!isAuthError(e) && !isRetryable(e) && !isModelError(e)) throw e;
-        if (!isAuthError(e) && n < o.retries) {
+        if (isRetryable(e) && n < o.retries) {
           o.onEvent({ kind: "retry", model, message: msgOf(e) });
           await sleep(o.baseMs * 2 ** n);
           continue;
