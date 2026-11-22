@@ -40,6 +40,6 @@ export async function runWithProgress(
 export function explainStartError(e: unknown): string {
   const m = e instanceof Error ? e.message : String(e);
   if (/fetch failed|ECONNREFUSED|ENOTFOUND/i.test(m))
-    return `Forge: cannot reach TrueForge. Start it with: OUTBOUND_URL_ALLOWED_HOSTS='["127.0.0.1"]' npx @truefoundry/trueforge@latest (then check forgeAgent.baseUrl). (${m})`;
+    return `Forge: cannot reach TrueForge. Start it with OUTBOUND_URL_ALLOWED_HOSTS set to ["127.0.0.1"] (PowerShell: $env:OUTBOUND_URL_ALLOWED_HOSTS='["127.0.0.1"]'; npx @truefoundry/trueforge@latest), then check forgeAgent.baseUrl. (${m})`;
   return `Forge: ${m}`;
 }

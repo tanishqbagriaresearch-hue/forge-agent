@@ -33,6 +33,13 @@ OUTBOUND_URL_ALLOWED_HOSTS='["127.0.0.1"]' npx @truefoundry/trueforge@latest
 # serves http://localhost:8790  (API docs at /api/v1/docs)
 ```
 
+Windows PowerShell:
+
+```powershell
+$env:OUTBOUND_URL_ALLOWED_HOSTS='["127.0.0.1"]'
+npx @truefoundry/trueforge@latest
+```
+
 `OUTBOUND_URL_ALLOWED_HOSTS` is required: TrueForge's SSRF guard blocks loopback URLs by default, and the editor MCP
 server (and any local model endpoint) lives on 127.0.0.1. (`NETWORK_POLICY_ENABLED=false` also works.)
 
@@ -42,6 +49,7 @@ Copy `forge-agent.config.example.json` to `forge-agent.config.json`, edit endpoi
 
 ```bash
 export PRIMARY_API_KEY=...   BACKUP_API_KEY=...     # never committed; read from the environment
+# Windows PowerShell: $env:PRIMARY_API_KEY='...'; $env:BACKUP_API_KEY='...'
 npm run provision            # registers each endpoint in TrueForge as a "custom" OpenAI-compatible provider
 ```
 
