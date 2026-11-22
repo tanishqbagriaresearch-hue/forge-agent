@@ -8,7 +8,7 @@ title: "Forge Agent — Write-up"
 
 ## 2. Starting point
 
-**From scratch.** A new TypeScript VS Code extension (MIT); no upstream coding-agent fork, so no upstream code or licence is carried over. Dependencies: `@truefoundry/trueforge-sdk`, `@modelcontextprotocol/sdk`, `diff`, `zod`, `esbuild`, `vitest`. Repo: [[public GitHub URL]].
+**From scratch.** A new TypeScript VS Code extension (MIT); no upstream coding-agent fork, so no upstream code or licence is carried over. Dependencies: `@truefoundry/trueforge-sdk`, `@modelcontextprotocol/sdk`, `diff`, `zod`, `esbuild`, `vitest`. Repo: https://github.com/tanishqbagriaresearch-hue/forge-agent.
 
 ## 3. Architecture on TrueForge
 

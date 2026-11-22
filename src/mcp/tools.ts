@@ -118,11 +118,12 @@ export class EditorTools {
       const rel = this.rel(abs);
       if ((await host.readFile(abs)) !== original) { report.push(`SKIPPED ${rel}: file changed on disk since staging (conflict)`); continue; }
       const hunks = computeHunks(original ?? "", proposed);
+      if (!hunks.length) { report.push(`UNCHANGED ${rel}: the proposed text is identical to the file`); continue; }
       const acc = review.decisions.get(abs) ?? new Set<number>();
       if (!acc.size) { report.push(`REJECTED ${rel}: no hunks accepted`); continue; }
       writes.push({ abs, content: applyHunks(original ?? "", hunks, acc), before: original });
       const rejected = hunks.map((h) => h.id).filter((id) => !acc.has(id));
-      report.push(`APPLIED ${rel}: hunks ${[...acc].sort().join(",")} of ${hunks.length}${rejected.length ? ` (rejected ${rejected.join(",")})` : ""}`);
+      report.push(`APPLIED ${rel}: hunks ${[...acc].sort((x, y) => x - y).join(",")} of ${hunks.length}${rejected.length ? ` (rejected ${rejected.join(",")})` : ""}`);
     }
     if (writes.length) {
       await host.applyFiles(writes.map(({ abs, content }) => ({ abs, content })));

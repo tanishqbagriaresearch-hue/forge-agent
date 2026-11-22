@@ -7,7 +7,7 @@ import { VscodeReview } from "./ui/review";
 import { VscodeHost } from "./ui/vscodeHost";
 import { AgentPanel } from "./ui/panel";
 import { buildInlineEditPrompt } from "./ui/inlineEdit";
-import { runWithProgress, explainStartError, type Hub } from "./ui/run";
+import { runWithProgress, explainStartError, isRunActive, type Hub } from "./ui/run";
 import { parseMentions, expandMentions } from "./context/mentions";
 import { upsertModelProvider } from "./forge/provision";
 import { isIgnoredPath } from "./workspace/walk";
@@ -81,6 +81,7 @@ export async function activate(ctx: vscode.ExtensionContext): Promise<void> {
 
   panel = new AgentPanel(ctx.extensionUri, {
     send: async (text) => {
+      if (isRunActive()) { panel.post({ type: "notice", text: "Forge is already working on a request; stop it first or wait for it to finish." }); return; }
       let prompt = text;
       try {
         const core = await getCore();

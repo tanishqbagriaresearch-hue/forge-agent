@@ -29,6 +29,7 @@ export class AgentRunner {
   private abort = new AbortController();
   private cancelled = false;
   private running = false;
+  private appliedThisRun = false;
   private sessionId: string | undefined;
   private models: string[];
   constructor(private o: RunnerOptions) {
@@ -44,6 +45,7 @@ export class AgentRunner {
     const { events } = this.o;
     if (this.running) { events.notice("Forge is already working on a request; wait for it or stop it first."); return { status: "busy", model: "" }; }
     this.running = true;
+    this.appliedThisRun = false;
     this.cancelled = false;
     this.abort = new AbortController();
     this.o.review.signal = this.abort.signal;
@@ -53,7 +55,15 @@ export class AgentRunner {
     try {
       const status = await withFallback(this.models, async (model) => {
         usedModel = model;
-        return this.attempt(model, prompt);
+        try {
+          return await this.attempt(model, prompt);
+        } catch (e) {
+          if (!this.appliedThisRun) throw e;
+          // Never replay the request on another model after the user already applied hunks: it would edit the edited files again.
+          const err = new Error(`${e instanceof Error ? e.message : String(e)}. The changes you already applied in this run were kept (use Forge: Undo to revert them); not retrying on another model.`);
+          (err as Error & { noFallback?: boolean }).noFallback = true;
+          throw err;
+        }
       }, {
         retries: this.o.retries ?? 2, baseMs: this.o.baseMs ?? 800,
         sleep: (ms) => { const s = this.o.sleep ?? ((n: number) => new Promise<void>((r) => setTimeout(r, n))); return Promise.race([s(ms), new Promise<void>((r) => { if (this.abort.signal.aborted) r(); else this.abort.signal.addEventListener("abort", () => r(), { once: true }); })]); },
@@ -180,10 +190,11 @@ export class AgentRunner {
         const hunks = computeHunks(s.original ?? "", s.proposed);
         if (hunks.length) items.push({ abs, original: s.original, proposed: s.proposed, hunks });
       }
-      if (!items.length) return { status: "allow" };
+      if (!items.length) { review.decisions = new Map(); return { status: "allow" }; }
       const decisions = await host.reviewChanges(items, this.abort.signal);
       review.decisions = decisions;
       const any = [...decisions.values()].some((s) => s.size > 0);
+      if (any) this.appliedThisRun = true;
       return any ? { status: "allow" } : { status: "deny", reason: "the user rejected all changes" };
     }
     if (name === "run_command") {

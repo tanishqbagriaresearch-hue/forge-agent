@@ -43,6 +43,18 @@
       {
         "command": "forgeAgent.switchModel",
         "title": "Forge: Switch Model"
+      },
+      {
+        "command": "forgeAgent.review.pick",
+        "title": "Forge: Choose Hunks to Apply"
+      },
+      {
+        "command": "forgeAgent.review.apply",
+        "title": "Forge: Apply Accepted Hunks"
+      },
+      {
+        "command": "forgeAgent.review.rejectAll",
+        "title": "Forge: Reject All Proposed Changes"
       }
     ],
     "keybindings": [
@@ -64,6 +76,20 @@
           "command": "forgeAgent.inlineEdit",
           "when": "editorHasSelection",
           "group": "navigation@100"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "forgeAgent.review.pick",
+          "when": "forgeAgent.reviewing"
+        },
+        {
+          "command": "forgeAgent.review.apply",
+          "when": "forgeAgent.reviewing"
+        },
+        {
+          "command": "forgeAgent.review.rejectAll",
+          "when": "forgeAgent.reviewing"
         }
       ]
     },
@@ -171,5 +197,9 @@
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.1.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tanishqbagriaresearch-hue/forge-agent.git"
   }
 }

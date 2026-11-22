@@ -9,6 +9,6 @@
 6. **Task C:** put the unreachable/invalid model first in `forgeAgent.models`, repeat Task A, confirm the notice, editor responsiveness and `git status` (clean until you accept hunks).
 7. Cancel test: start a run, press `Esc`; confirm the status returns to idle and `git status` is clean.
 
-Review UI specifics to check: the hunk checklist (QuickPick) appears after the diff tabs open; unchecking a hunk and pressing Enter writes only the checked hunks (`git diff`); Esc on the list leaves the diffs open and the status bar item "Forge review" re-opens it; a second review of the same file shows the new diff (not the first).
+Review UI specifics to check: the hunk checklist (QuickPick) appears after the diff tabs open; unchecking a hunk and pressing Enter writes only the checked hunks (`git diff`); Esc on the list leaves the diffs open and the status bar item "Forge review" re-opens it; the ✕ button rejects everything and `git status` stays clean; the status bar item disappears once the review ends; a second review of the same file shows the new diff (not the first).
 
 Things to eyeball that automated tests cannot: CodeLens placement, diff tab titles, panel rendering in your theme, and the Esc keybinding.

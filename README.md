@@ -20,10 +20,10 @@ VS Code extension ──SDK/HTTP──▶ TrueForge (agent loop, model routing)
 Requirements: Node ≥ 22.14, VS Code ≥ 1.90, git.
 
 ```bash
-git clone <this repo> forge-agent && cd forge-agent
+git clone https://github.com/tanishqbagriaresearch-hue/forge-agent.git forge-agent && cd forge-agent
 npm ci
 npm run build            # bundles dist/extension.js
-npm test                 # 95 unit tests, no network needed
+npm test                 # 104 unit tests, no network needed
 ```
 
 ### 1. Start TrueForge locally
@@ -78,7 +78,7 @@ Or install a packaged build: `npm run package` → `code --install-extension for
 | **Inline edit** | Select code → `Ctrl+Alt+K` (`Cmd+Alt+K`) or right-click → *Forge: Edit Selection* → type the instruction. Review the diff, then apply. |
 | **Agent mode** | Activity-bar *Forge Agent* panel → describe the task. The agent finds the files itself (`retrieve_context`, `find_symbol`, `search_workspace`), edits several files, and verifies with tests. |
 | **Context assembly** | `@path/to/file` and `@sym:name` in the panel expand within a token budget; the agent also retrieves automatically. The panel lists which chunks were chosen and why. |
-| **Diff review** | Nothing is written until you accept. A diff editor opens per file and a checklist lists every hunk (check/uncheck per hunk; Enter applies the checked ones, Esc rejects). Only accepted hunks are written, in one batch. (CodeLens toggles also appear if you enable `diffEditor.codeLens`.) *Forge: Undo Last Applied Change* restores the exact previous contents. |
+| **Diff review** | Nothing is written until you accept. A diff editor opens per file and a checklist lists every hunk (check/uncheck per hunk; Enter applies the checked ones, the ✕ button rejects all; Esc just closes the list and the *Forge review* status-bar item reopens it). Only accepted hunks are written, in one batch. (CodeLens toggles also appear if you enable `diffEditor.codeLens`.) *Forge: Undo Last Applied Change* restores the exact previous contents. |
 | **Streaming & cancel** | Tokens stream into the panel. `Esc` (when no widget is open), the notification's Cancel, the status bar, or *Forge: Stop* cancels the TrueForge turn, closes any pending review and discards staged edits — the workspace is never half-written. |
 
 ### Resilience (Task C behaviour)
@@ -91,7 +91,7 @@ are in memory only, so `git status` stays clean.
 
 ## Verification evidence
 
-* `npm test` — 95 unit tests (hunk maths, overlay, undo, BM25 retrieval, MCP tools, runner, resilience, activation).
+* `npm test` — 104 unit tests (hunk maths, overlay, undo, BM25 retrieval, MCP tools, runner, resilience, activation).
 * `npm run e2e` — end-to-end against **real TrueForge** and **real Flask 3.1.3 @ 22d92470** (cloned to `/tmp/forge-e2e`,
   Python venv, pytest 9.0.2): Tasks A, B and C, cancel mid-stream, cancel during review, reject-all. 30/30 checks.
   The model in that harness is a *scripted mock* OpenAI-compatible server (so the run is deterministic and keyless);
@@ -109,7 +109,7 @@ are in memory only, so `git status` stays clean.
 
 `src/core.ts` wiring · `src/agent/` session spec + runner · `src/forge/` SDK client, provisioning, resilience ·
 `src/mcp/` editor MCP server and tools · `src/context/` chunker, BM25 index, @-mentions ·
-`src/workspace/` hunks, overlay, undo · `src/ui/` VS Code review/panel/inline edit · `scripts/` provisioning, mock model, e2e.
+`src/workspace/` hunks, overlay, undo · `docs/design/` design doc and implementation plan · `src/ui/` VS Code review/panel/inline edit · `scripts/` provisioning, mock model, e2e.
 
 ## Notes for the Flask tasks
 

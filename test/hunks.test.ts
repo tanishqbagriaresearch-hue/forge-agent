@@ -48,3 +48,20 @@ describe("hunks", () => {
     expect(computeHunks("same\n", "same\n")).toEqual([]);
   });
 });
+
+describe("mixed line endings", () => {
+  it("keeps each untouched line's own ending (LF-dominant file)", () => {
+    const oldT = "a\r\nb\nc\n";
+    const hs = computeHunks(oldT, "a\nB\nc\n");
+    expect(applyHunks(oldT, hs, new Set([1]))).toBe("a\r\nB\nc\n");
+  });
+  it("uses the dominant ending for new lines (CRLF-dominant file)", () => {
+    const oldT = "a\r\nb\r\nc\n";
+    const hs = computeHunks(oldT, "a\r\nB\r\nc\r\n");
+    expect(applyHunks(oldT, hs, new Set([1]))).toBe("a\r\nB\r\nc\n");
+  });
+  it("rejecting every hunk returns the file byte-for-byte", () => {
+    const oldT = "a\r\nb\nc";
+    expect(applyHunks(oldT, computeHunks(oldT, "a\nB\nc"), new Set())).toBe(oldT);
+  });
+});

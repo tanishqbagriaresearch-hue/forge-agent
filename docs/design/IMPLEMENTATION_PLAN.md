@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, VS Code API, `@truefoundry/trueforge-sdk`, `@modelcontextprotocol/sdk`, `diff`, esbuild, vitest. Node >= 22.14.
 
-**Spec:** `docs/superpowers/specs/2026-11-22-forge-agent-design.md`
+**Spec:** `docs/design/DESIGN.md`
 
 ## Global Constraints
 

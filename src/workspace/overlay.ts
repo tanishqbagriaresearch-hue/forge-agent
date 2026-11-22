@@ -1,7 +1,7 @@
+import { eolOf } from "./hunks";
 export type Staged = { original: string | null; proposed: string };
 
 const lf = (t: string) => t.replace(/\r\n/g, "\n");
-const eolOf = (t: string) => (t.includes("\r\n") ? "\r\n" : "\n");
 
 export class Overlay {
   private entries = new Map<string, Staged>();

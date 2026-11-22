@@ -4,7 +4,8 @@ export type Hunk = { id: number; oldStart: number; oldLines: number; newStart: n
 
 const CONTEXT = 3;
 const lf = (t: string) => t.replace(/\r\n/g, "\n");
-const eolOf = (t: string) => (t.includes("\r\n") ? "\r\n" : "\n");
+/** The file's dominant line ending (CRLF only if most line breaks are CRLF). */
+export const eolOf = (t: string) => { const crlf = (t.match(/\r\n/g) ?? []).length; return crlf * 2 > (t.match(/\n/g) ?? []).length ? "\r\n" : "\n"; };
 type Op = { t: " " | "-" | "+"; line: string };
 
 export function computeHunks(oldText: string, newText: string): Hunk[] {
@@ -55,18 +56,22 @@ export function computeHunks(oldText: string, newText: string): Hunk[] {
 
 export function applyHunks(oldText: string, hunks: Hunk[], acceptedIds: Set<number>): string {
   const eol = eolOf(oldText);
-  const src = lf(oldText).split("\n");
-  const out: string[] = [];
+  const raw = oldText.split("\n");
+  const src = raw.map((l) => l.replace(/\r$/, ""));
+  // ending that followed each source line (the last element has none); copied lines keep theirs, new lines get the dominant one
+  const ends = raw.map((l, i) => (i === raw.length - 1 ? "" : l.endsWith("\r") ? "\r\n" : "\n"));
+  const out: { text: string; end?: string }[] = [];
   let i = 0;
+  const copy = () => { out.push({ text: src[i], end: ends[i] }); i++; };
   for (const h of [...hunks].sort((x, y) => x.oldStart - y.oldStart)) {
-    while (i < h.oldStart - 1) out.push(src[i++]);
-    if (acceptedIds.has(h.id)) {
-      for (const l of h.lines) if (l[0] !== "-") out.push(l.slice(1));
-    } else {
-      for (const l of h.lines) if (l[0] !== "+") out.push(l.slice(1));
+    while (i < h.oldStart - 1) copy();
+    const accepted = acceptedIds.has(h.id);
+    for (const l of h.lines) {
+      if (l[0] === " " || (l[0] === "-" && !accepted)) copy();
+      else if (l[0] === "+" && accepted) out.push({ text: l.slice(1) });
+      else if (l[0] === "-") i++;
     }
-    i += h.oldLines;
   }
-  while (i < src.length) out.push(src[i++]);
-  return out.join("\n").replace(/\n/g, eol);
+  while (i < src.length) copy();
+  return out.map((o, k) => (k === out.length - 1 ? o.text : o.text + (o.end || eol))).join("");
 }

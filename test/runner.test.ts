@@ -239,3 +239,45 @@ describe("run lifecycle safety", () => {
     expect((await first).status).toBe("cancelled");
   });
 });
+
+describe("fallback after applied changes", () => {
+  it("does not re-run the request on another model once the user applied hunks, and says the edits were kept", async () => {
+    const t = setup(["first", "second"], {
+      first: [
+        [created(), stageXY, msg("e4", "apply_changes", { summary: "s" }),
+          { type: "tool.approval_required", id: "e5", threadId: "main", toolCalls: [{ id: "tc-e4", sourceEventId: "e4" }] },
+          { type: "turn.update", id: "e6", state: { status: "paused" }, threadId: null }],
+        [done("e8", { status: "error", message: "[Model Error] Cannot connect to API: ECONNREFUSED" })],
+      ],
+      second: [[created(), done("e2")]],
+    });
+    const r = await t.runner.run("go");
+    expect(r.status).toBe("error");
+    expect(t.calls.created).toEqual(["first"]);
+    expect(t.log.notices.join(" ")).toMatch(/kept.*Undo/i);
+  });
+  it("still falls back when the user applied nothing", async () => {
+    const t = setup(["first", "second"], {
+      first: [[created(), done("e2", { status: "error", message: "[Model Error] Cannot connect to API: ECONNREFUSED" })]],
+      second: [[created(), done("e2")]],
+    });
+    expect((await t.runner.run("go")).model).toBe("second");
+  });
+});
+
+describe("apply_changes with nothing to change", () => {
+  it("records empty decisions so the tool can report instead of failing", async () => {
+    const t = setup(["good"], {
+      good: [
+        [created(), async () => { await T.overlay.stageEdit(path.join(T.root, "a.py"), "x = 1", "x = 1"); }, msg("e4", "apply_changes", { summary: "s" }),
+          { type: "tool.approval_required", id: "e5", threadId: "main", toolCalls: [{ id: "tc-e4", sourceEventId: "e4" }] }],
+        [done("e8")],
+      ],
+    });
+    let seen: unknown = "unset";
+    const orig = (t.runner as any).client.sendEvents;
+    (t.runner as any).client.sendEvents = async (...a: any[]) => { seen = t.review.decisions; return orig(...a); };
+    await t.runner.run("go");
+    expect(seen).toEqual(new Map());
+  });
+});

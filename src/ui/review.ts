@@ -87,7 +87,7 @@ export class VscodeReview implements vscode.CodeLensProvider, vscode.TextDocumen
     });
   }
 
-  /** Checkbox list of every hunk: Enter applies the checked ones, Esc rejects everything. Reopen from the status bar. */
+  /** Checkbox list of every hunk: Enter applies the checked ones; the ✕ button rejects all; Esc only closes the list (reopen from the status bar). */
   private pick(): void {
     if (!this.finish) return;
     this.picker?.dispose();
@@ -99,9 +99,11 @@ export class VscodeReview implements vscode.CodeLensProvider, vscode.TextDocumen
     const picks = hunkPickItems([...this.items.values()], this.root);
     qp.items = picks;
     qp.selectedItems = picks.filter((p) => this.accepted.get(p.abs)?.has(p.id));
-    qp.buttons = [];
+    const rejectBtn = { iconPath: new vscode.ThemeIcon("close-all"), tooltip: "Reject all proposed changes" };
+    qp.buttons = [rejectBtn];
+    qp.onDidTriggerButton((b) => { if (b === rejectBtn) { qp.hide(); this.rejectAll(); } });
     qp.onDidAccept(() => { this.accepted = new Map([...this.items.keys()].map((k) => [k, new Set<number>()])); for (const [k, v] of decisionsFromPicks(qp.selectedItems)) this.accepted.set(k, v); qp.hide(); this.apply(); });
-    qp.onDidHide(() => { if (this.picker === qp) this.picker = null; qp.dispose(); this.updateStatus(); });
+    qp.onDidHide(() => { if (this.picker === qp) this.picker = null; qp.dispose(); if (this.finish) this.updateStatus(); });
     qp.show();
   }
 
@@ -109,6 +111,7 @@ export class VscodeReview implements vscode.CodeLensProvider, vscode.TextDocumen
     const s = this.accepted.get(abs);
     if (!s) return;
     if (s.has(id)) s.delete(id); else s.add(id);
+    if (this.picker) this.picker.selectedItems = this.picker.items.filter((p: { abs: string; id: number }) => this.accepted.get(p.abs)?.has(p.id));
     this.updateStatus();
     this.lenses.fire();
   }
@@ -122,11 +125,13 @@ export class VscodeReview implements vscode.CodeLensProvider, vscode.TextDocumen
     this.status.text = `$(git-pull-request) Forge review: ${ok}/${total} hunks accepted — click to choose hunks / apply`;
     this.status.command = "forgeAgent.review.pick";
     this.status.show();
+    void vscode.commands.executeCommand("setContext", "forgeAgent.reviewing", true);
   }
 
   private async cleanup(): Promise<void> {
     this.picker?.hide();
     this.status.hide();
+    void vscode.commands.executeCommand("setContext", "forgeAgent.reviewing", false);
     const tabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs).filter((t) => t.input instanceof vscode.TabInputTextDiff && (t.input as vscode.TabInputTextDiff).modified.scheme === PROP);
     try { await vscode.window.tabGroups.close(tabs); } catch { /* tabs already closed */ }
     this.items = new Map();

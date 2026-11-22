@@ -37,3 +37,16 @@ describe("isIgnoredPath", () => {
     expect(isIgnoredPath("src/flask/cli.py")).toBe(false);
   });
 });
+
+describe("package.json contributions", () => {
+  it("every contributed command and keybinding command is registered on activation", async () => {
+    fake.registered.clear();
+    fake.workspace.workspaceFolders = [{ uri: vscode.Uri.file(fs.mkdtempSync(path.join(os.tmpdir(), "act-"))) }];
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+    const ctx = { subscriptions: [] as any[], extensionUri: vscode.Uri.file("/ext"), workspaceState: { get: () => undefined, update: async () => {} } };
+    await activate(ctx as any);
+    const ids = [...pkg.contributes.commands.map((c: any) => c.command), ...pkg.contributes.keybindings.map((k: any) => k.command)];
+    for (const id of ids) expect(fake.registered.has(id), id).toBe(true);
+    await deactivate();
+  });
+});

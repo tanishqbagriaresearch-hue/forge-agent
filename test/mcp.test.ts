@@ -145,3 +145,23 @@ describe("editor MCP", () => {
     expect(text(r)).toMatch(/aborted/i);
   });
 });
+
+describe("apply_changes reporting", () => {
+  it("reports hunk ids in numeric order", async () => {
+    const big = Array.from({ length: 120 }, (_, i) => `row${i + 1}`).join("\n") + "\n";
+    fs.writeFileSync(path.join(root, "src/big.py"), big);
+    for (const n of [2, 12, 22, 32, 42, 52, 62, 72, 82, 92, 102])
+      await call("propose_edit", { path: "src/big.py", old_text: `row${n}\n`, new_text: `ROW${n}\n` });
+    const abs = path.join(root, "src/big.py");
+    review.decisions = new Map([[abs, new Set(Array.from({ length: 11 }, (_, i) => i + 1))]]);
+    const r = text(await call("apply_changes", { summary: "many" }));
+    expect(r).toContain("hunks 1,2,3,4,5,6,7,8,9,10,11 of 11");
+  });
+  it("calls an edit that changes nothing UNCHANGED, not REJECTED", async () => {
+    await call("propose_edit", { path: "src/a.py", old_text: "line2\n", new_text: "line2\n" });
+    review.decisions = new Map();
+    const r = text(await call("apply_changes", { summary: "noop" }));
+    expect(r).toContain("UNCHANGED src/a.py");
+    expect(r).not.toContain("REJECTED");
+  });
+});
